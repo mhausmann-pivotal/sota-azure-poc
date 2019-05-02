@@ -1,0 +1,4 @@
+---
+username: ((opsmanager_user.username)) 
+password: ((opsmanager_user.password))
+decryption-passphrase: ((opsmanager_user.password)) 

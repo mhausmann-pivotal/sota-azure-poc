@@ -1,0 +1,58 @@
+resource_types:
+  - name: pivnet
+    type: docker-image
+    source:
+      repository: pivotalcf/pivnet-resource
+      tag: latest-final
+
+resources:
+  - name: platform_automation_pivnet
+    type: pivnet
+    source:
+      api_token: ((pivnet_token))
+      product_slug: platform-automation
+      product_version: 2.2.(.*)
+      sort_by: semver
+
+  - name: repo
+    type: git
+    source:
+      uri: https://github.com/mhausmann-pivotal/sota-azure-poc.git
+      branch: master
+
+jobs:
+
+  - name: configure_opsman
+    serial: true
+    plan:
+      - aggregate:
+          - get: platform_automation_image
+            resource: platform_automation_pivnet
+            params:
+              globs: ["platform-automation-image-*.tgz"]
+              unpack: true
+
+          - get: platform_automation_tasks
+            resource: platform_automation_pivnet
+            params:
+              globs: ["platform-automation-tasks-*.zip"]
+              unpack: true
+          - get: repo
+
+      - task: credhub_interpolate
+        image: platform_automation_image
+        file: platform_automation_tasks/tasks/credhub_interpolate.yml
+        input_mapping:
+          files: repo
+        params:
+          CREDHUB_CA_CERT: ((credhub_ca_cert))
+          CREDHUB_CLIENT: ((credhub_username))
+          CREDHUB_SECRET: ((credhub_password))
+          CREDHUB_SERVER: "192.168.51.6:8844"
+
+      - task: configure_authentication
+        image: platform_automation_image
+        file: platform_automation_tasks/tasks/configure-authentication.yml
+        input_mapping:
+          config: interpolated-files
+        attempts: 10
